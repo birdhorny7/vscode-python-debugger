@@ -273,24 +273,27 @@ export abstract class BaseConfigurationResolver<T extends DebugConfiguration>
             // Expand ${workspaceFolder} variable first if necessary.
             pathMappings = pathMappings.map(({ localRoot: mappedLocalRoot, remoteRoot }) => {
                 const resolvedLocalRoot = resolveWorkspaceVariables(mappedLocalRoot, defaultLocalRoot, undefined);
+                const resolvedRemoteRoot = resolveWorkspaceVariables(remoteRoot, defaultLocalRoot, undefined);
                 return {
                     localRoot: resolvedLocalRoot || '',
-                    // TODO: Apply to remoteRoot too?
-                    remoteRoot,
+                    remoteRoot: resolvedRemoteRoot || '',
                 };
             });
         }
 
         // If on Windows, lowercase the drive letter for path mappings.
-        // TODO: Apply even if no localRoot?
         if (getOSType() === OSType.Windows) {
-            // TODO: Apply to remoteRoot too?
-            pathMappings = pathMappings.map(({ localRoot: windowsLocalRoot, remoteRoot }) => {
-                let localRoot = windowsLocalRoot;
-                if (windowsLocalRoot.match(/^[A-Z]:/)) {
-                    localRoot = `${windowsLocalRoot[0].toLowerCase()}${windowsLocalRoot.substr(1)}`;
-                }
-                return { localRoot, remoteRoot };
+            pathMappings = pathMappings.map(({ localRoot, remoteRoot }) => {
+                const lowerCaseDriveLetter = (root: string): string => {
+                    if (root.match(/^[A-Z]:/)) {
+                        return `${root[0].toLowerCase()}${root.substr(1)}`;
+                    }
+                    return root;
+                };
+                return {
+                    localRoot: lowerCaseDriveLetter(localRoot),
+                    remoteRoot: lowerCaseDriveLetter(remoteRoot),
+                };
             });
         }
 

@@ -13,10 +13,11 @@ import { CancellationToken } from 'vscode-jsonrpc';
 import { BaseConfigurationResolver } from '../../../../extension/debugger/configuration/resolvers/base';
 import * as helper from '../../../../extension/debugger/configuration/resolvers/helper';
 import * as vscodeapi from '../../../../extension/common/vscodeapi';
-import { AttachRequestArguments, DebugOptions, LaunchRequestArguments } from '../../../../extension/types';
+import { AttachRequestArguments, DebugOptions, LaunchRequestArguments, PathMapping } from '../../../../extension/types';
 import { PythonEnvironment } from '../../../../extension/debugger/adapter/types';
 import { PythonPathSource } from '../../../../extension/debugger/types';
 import * as pythonApi from '../../../../extension/common/python';
+import * as platform from '../../../../extension/common/platform';
 
 suite('Debugging - Config Resolver', () => {
     class BaseResolver extends BaseConfigurationResolver<AttachRequestArguments | LaunchRequestArguments> {
@@ -61,6 +62,14 @@ suite('Debugging - Config Resolver', () => {
 
         public isDebuggingFlask(debugConfiguration: Partial<LaunchRequestArguments & AttachRequestArguments>) {
             return BaseConfigurationResolver.isDebuggingFlask(debugConfiguration);
+        }
+
+        public fixUpPathMappings(
+            pathMappings: PathMapping[],
+            defaultLocalRoot?: string,
+            defaultRemoteRoot?: string,
+        ) {
+            return BaseConfigurationResolver.fixUpPathMappings(pathMappings, defaultLocalRoot, defaultRemoteRoot);
         }
 
         public getPythonPathSource() {
@@ -314,6 +323,31 @@ suite('Debugging - Config Resolver', () => {
         const config = {};
         const isFlask = resolver.isDebuggingFlask(config as LaunchRequestArguments);
         expect(isFlask).to.equal(false, 'flask');
+    });
+
+    test('Should resolve workspace variables in local and remote path mapping roots', () => {
+        const pathMappings = resolver.fixUpPathMappings(
+            [{ localRoot: '${workspaceFolder}/src', remoteRoot: '${workspaceFolder}/app' }],
+            '/workspace',
+        );
+
+        expect(pathMappings).to.deep.equal([
+            { localRoot: '/workspace/src', remoteRoot: '/workspace/app' },
+        ]);
+    });
+
+    test('Should lowercase drive letters in local and remote path mapping roots on Windows', () => {
+        const getOSTypeStub = sinon.stub(platform, 'getOSType').returns(platform.OSType.Windows);
+
+        const pathMappings = resolver.fixUpPathMappings(
+            [{ localRoot: '', remoteRoot: 'C:\\remote\\app' }],
+            'D:\\workspace',
+        );
+
+        getOSTypeStub.restore();
+        expect(pathMappings).to.deep.equal([
+            { localRoot: '', remoteRoot: 'c:\\remote\\app' },
+        ]);
     });
 });
 
